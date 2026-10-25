@@ -2,87 +2,117 @@
 
 [![CI](https://github.com/Saigwe/product-analytics-experiments/actions/workflows/ci.yml/badge.svg)](https://github.com/Saigwe/product-analytics-experiments/actions/workflows/ci.yml)
 
-> Product analytics on raw app events: sessionisation, funnels, retention cohorts and DAU/MAU, plus an A/B testing kit with sample-ratio checks and CUPED, all defined once in dbt.
+> Product analytics on 2.76 million real e-commerce events: sessions, funnel, retention cohorts and stickiness, defined once in dbt. Plus an A/B testing toolkit (sample size, sample-ratio checks, CUPED, guardrails), validated on 269,683 real visitors with A/A tests and planted effects.
 
 **Author:** Stanley Igwe, Lead Data (Analytics) Engineer · [Portfolio](https://saigwe.github.io)
-**Stack:** BigQuery (sandbox) or DuckDB · dbt Core · Lightdash or Looker Studio · Python (statsmodels, scipy)
-**Status:** 🚧 Scaffolded. Fixture pipeline passes: `dbt build` 18/18. See [Roadmap](#roadmap).
+**Stack:** Python · DuckDB · dbt Core (unit tests) · NumPy / SciPy · pytest · GitHub Actions
+**Status:** Core build complete on the full RetailRocket dataset. See [Roadmap](#roadmap).
 
-Project 8 of my portfolio plan. Consumer-electronics product analytics from my analytics engineering role at a consumer-audio company (keep claims in this README to what you can verify). This repo rebuilds the problem on public and synthetic data. No employer or client data, code or logic is used.
+This rebuilds the consumer product analytics from my analytics engineering role at a consumer-audio company, on public data. Projects 8 and 9 of my plan are combined here; no employer data is used.
 
 ---
 
 ## 90-second summary
 | | |
 |---|---|
-| **Problem** | TODO: one sentence on the business problem. |
-| **What I built** | TODO: fill in as the roadmap lands. |
-| **Why it matters** | TODO: the decision this enables, in the user's words. |
-| **Proof** | TODO: link to [Numbers](#numbers), with every claim reproducible. |
+| **Problem** | Product teams argue about "conversion" because every dashboard defines sessions, funnels and retention differently, and A/B tests get called on noise or on broken splits. |
+| **What I built** | dbt models that define each metric once (sessions, funnel, day-N retention, DAU/MAU), with bot exclusion and reconciliation tests. A tested statistics toolkit. Simulations on real visitors that measure false positives, power and CUPED's effect. A product write-up on the one metric worth moving. |
+| **Why it matters** | One trusted number per metric, and experiments that only declare winners that are real, sized for the traffic the site actually has. |
+| **Proof** | 27 dbt checks pass on 2.76M events in 8.5 s. Planted lifts are recovered within 0.3 points, with 93–97% interval coverage. A 2% split error is caught (p = 2e-10). See [Numbers](#numbers). |
 
 ## Architecture
 ```mermaid
 flowchart LR
-  R[Real data source<br/>see Data] -.->|roadmap| B[(bronze)]
-  F[tests/fixtures/make_fixture.py<br/>synthetic fixture] --> B
-  B -->|dbt staging| S[(silver<br/>stg_* views, keys tested)]
-  S -->|dbt marts| G[(gold<br/>facts and reports)]
+  K[RetailRocket events.csv<br/>2.76M events, Kaggle] -->|load_retailrocket.py| B[(bronze.events)]
+  F[CI fixture<br/>same format] --> B
+  B --> S[stg_retailrocket__events]
+  S --> BOT[int_bot_visitors<br/>>300 views in a day]
+  S & BOT --> SE[int_events_sessionised<br/>30-minute rule]
+  SE --> FS[fct_sessions] --> UD[fct_user_day]
+  FS --> FN[rpt_funnel_weekly]
+  UD --> RT[rpt_retention<br/>day 1 / 7 / 30]
+  UD --> DM[rpt_dau_mau]
+  UD --> SIM[analysis/simulate_experiments.py<br/>A/A · planted lifts · SRM]
+  TK[experiments/stats.py<br/>sample size · SRM · CUPED · guardrail] --> SIM
 ```
 
-## Data
-Real data: the [Google Analytics 4 sample e-commerce dataset](https://developers.google.com/analytics/bigquery/web-ecommerce-demo-dataset) in the BigQuery public datasets (free sandbox). CI uses a synthetic users, events and experiment-assignment fixture.
+## Metric definitions (defined once)
+- **Session:** a visitor's events with no gap over 30 minutes. A unit test pins the boundary: 29 minutes stays in the same session, 31 starts a new one.
+- **Funnel:** sessions with a view → with an add-to-cart → with a purchase.
+- **Day-N retention:** the share of a weekly cohort of new visitors active exactly N days after their first day. A cohort reports day N only once its last member has had N days.
+- **Stickiness:** DAU ÷ 28-day active visitors.
+- **Bots:** visitors who view more than 300 items in one day are excluded, and the exclusion is reported (`rpt_data_quality`). The rule is deliberately conservative. The heaviest real accounts (one made 559 purchases) look like business buyers, not crawlers, so they stay in.
 
-| Bronze table (fixture) | Rows |
-|---|---|
-| `bronze.users` | 2,000 |
-| `bronze.events` | 40,000 |
-| `bronze.assignments` | 2,000 |
-
-## Data model (gold layer, first cut)
-| Model | Purpose |
-|---|---|
-| `rpt_retention_cohorts` | Weekly signup cohorts: share of each cohort active N weeks after signup. |
-| `rpt_experiment_results` | Conversion (any purchase) by experiment variant. |
-
-## Tests in place
-- Staging: `unique` / `not_null` on every key, and `relationships` on every foreign key
-- Marts: grain tests (`unique_combination`) and accepted values
-- Business rules: `assert_no_sample_ratio_mismatch`, `assert_retention_is_a_percentage`
+## Experiment toolkit (`experiments/stats.py`, 6 known-answer tests)
+- **`sample_size_per_arm`:** users needed per arm for a two-proportion test. Matches the textbook value: about 14,750 per arm for 10% → 11%.
+- **`srm_check`:** chi-square test that the split matches what was intended.
+- **`cuped`:** pre-period covariate adjustment. Unbiased, and the variance shrinks by corr².
+- **`diff_in_means`:** Welch interval and p-value.
+- **`guardrail`:** non-inferiority test (is the worst plausible change within the allowed margin?).
 
 ## Numbers
-*(Fill from real runs. Never estimate.)*
+Full RetailRocket dataset (3 May – 18 Sep 2015) on a Windows laptop. Reproduce with `make all`.
+
 | Metric | Value |
 |---|---|
-| Rows processed (real data) | _tbd_ |
-| dbt models / tests | _tbd_ |
-| `dbt build` runtime | _tbd_ |
+| Events / visitors | 2,756,101 / 1,407,580 (2,664,312 views, 69,332 add-to-carts, 22,457 transactions) |
+| Load / `dbt build` | 0.3 s / 8.5 s, all 27 checks passing |
+| Bot-like visitors excluded | 2 (0.06% of views) |
+| Sessions | 1,761,473; 87% of visitors have exactly one |
+
+**Funnel (all weeks):**
+
+| View sessions | → Cart sessions | → Purchase sessions | View → cart | Cart → purchase | View → purchase |
+|---|---|---|---|---|---|
+| 1,755,581 | 43,919 | 14,294 | **2.50%** | 32.6% | 0.81% |
+
+Weekly view → cart ranges from 2.26% to 2.84%. 2,365 purchase sessions have no add-to-cart logged in the same session (the cart was filled in an earlier session), so the funnel tests only enforce "view" as an upper bound.
+
+**Retention and stickiness:** average day-1 retention is 2.8%, day 7 is 0.6% and day 30 is 0.2% (cohorts over 1,000 visitors). DAU averages 11,812 against 304,636 visitors active over 28 days, a stickiness of 3.9%. 685 of 11,718 buyers (5.8%) bought in more than one session.
+
+**Experiment toolkit on real visitors** (269,683 active in the last 28 days; 500 simulations per row; [full results](results/experiments.md)):
+
+| Planted lift | Estimated | CI coverage | Power, raw | Power, CUPED |
+|---|---|---|---|---|
+| Conversion +5% | +4.7% | 93% | 20% | 20% |
+| Conversion +10% | +10.0% | 96% | 60% | 61% |
+| Views per visitor +2% | +2.0% | 95% | 24% | 31% |
+| Views per visitor +5% | +5.0% | 95% | 85% | **96%** |
+
+What the simulations show:
+- **The estimates are unbiased, and the intervals are honest.**
+- **CUPED helps when the pre-period predicts the outcome.** Views correlate 0.58 with the pre-period, so CUPED narrows the interval by 18% and lifts power at +5% from 85% to 96%. For conversion (correlation 0.06) it does nothing.
+- **A/A false-positive rates are 2.8% (conversion), 5.0% (views) and 6.8% (views with CUPED).** With 500 simulations the standard error is about 1 point, so 6.8% sits slightly high. Heavy-tailed buyer accounts are the likely cause; winsorising views is on the roadmap.
+- **A 2% loss of treatment units is caught** (SRM p = 1.9e-10). There were no false alarms in 500 fair splits.
+- **A 2% guardrail can't be verified at this traffic.** With no change applied, the guardrail still "fails": the noise (interval half-width about 0.06 views) is wider than the margin (0.034). A guardrail needs a margin the test can resolve, so widen it or run longer. That's exactly the kind of setting the toolkit should catch before launch.
+- **Sample size:** at 0.78% conversion, detecting +10% needs 210k visitors per arm, about 6 weeks of traffic. Only a +20% lift is detectable within 28 days.
+
+**Product write-up:** [the one metric I'd move](docs/product_writeup.md) is the add-to-cart rate per viewing session (2.5%). It's the leakiest funnel step, and tests on it need about 3× fewer units than tests on purchase conversion.
 
 ## How to run
 Requires **Python 3.12** (what CI uses) and `make`, or run the commands in the `Makefile` by hand.
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-make fixture-all   # synthetic fixture -> dbt build (used in CI)
+make all            # needs data/raw/events.csv (see ingestion/README.md)
+make fixture-all    # RetailRocket-format fixture (CI)
 ```
 
 ## Roadmap
-- [x] Scaffold: synthetic fixture, staging with key tests, first marts and business-rule tests, CI
-- [ ] Point the sources at the GA4 sample in BigQuery; keep the fixture for CI
-- [ ] Sessionise events (30-minute inactivity) and model a user-day grain
-- [ ] Funnels, D1/D7/D30 retention cohorts and DAU/MAU with one definition each
-- [ ] Fold in project 9: sample-size calculator, sample-ratio-mismatch check, CUPED and guardrail metrics
-- [ ] Simulate experiments with known effects and show the method recovers them
-- [ ] Write-up: the one metric I'd move as product owner, and why
-- [ ] Fill in [Numbers](#numbers) and the [design doc](docs/design_doc.md)
-- [ ] 3-minute Loom walkthrough
+- [x] Real event data (RetailRocket, chosen over the GA4 BigQuery sample so it needs no cloud account); CI fixture in the same format
+- [x] Sessionisation, funnel, day-N retention, DAU/MAU, bot exclusion, with unit and reconciliation tests
+- [x] Experiment toolkit (project 9): sample size, SRM, CUPED, Welch effects, guardrails
+- [x] Simulations with known effects on real visitors; product write-up
+- [ ] Delta-method variance for session-level metrics under visitor randomisation
+- [ ] Winsorised views and sequential testing (always-valid p-values)
+- [ ] Lightdash or Evidence dashboard on the gold models
 
 ## Interview topics this project prepares
-- Product sense and metric design
-- Sessionisation and retention SQL
-- A/B testing and SRM
-- Variance reduction (CUPED)
+- Product sense: choosing the metric to move, and why
+- Sessionisation, funnels, retention cohorts and stickiness in SQL
+- A/B testing: power, SRM, CUPED, guardrails and their pitfalls
+- Validating statistical tooling with A/A tests and planted effects
 
 ## Data and licence
-- **Fixture:** synthetic, generated with a fixed seed by `tests/fixtures/make_fixture.py` from `fixture_spec.yml`. It describes no real company or person.
-- **Real data:** see [Data](#data) for each source's own licence and terms.
+- **Data:** [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset), licensed CC BY-NC-SA 4.0. It's anonymised (hashed ids, no prices). The raw file is not committed (`data/` is gitignored).
 - **Code:** MIT (see `LICENSE`).
