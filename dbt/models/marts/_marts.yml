@@ -1,0 +1,12 @@
+version: 2
+models:
+  - name: rpt_retention_cohorts
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [cohort_week, week_number]
+  - name: rpt_experiment_results
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [experiment_id, variant]

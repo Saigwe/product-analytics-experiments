@@ -1,0 +1,22 @@
+name: product_analytics_experiments
+version: 0.1.0
+config-version: 2
+profile: product_analytics_experiments
+model-paths:
+- models
+macro-paths:
+- macros
+test-paths:
+- tests
+target-path: target
+clean-targets:
+- target
+- dbt_packages
+models:
+  product_analytics_experiments:
+    staging:
+      +schema: silver
+      +materialized: view
+    marts:
+      +schema: gold
+      +materialized: table

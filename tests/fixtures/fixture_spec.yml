@@ -1,0 +1,29 @@
+# Synthetic fixture for CI. Same table and column names as the real-data load.
+# pk / fk / cast describe the tables for staging and tests; the generator ignores them.
+seed: 808
+tables:
+  - name: users
+    rows: 2000
+    pk: user_id
+    cast: {signup_date: date}
+    columns:
+      user_id: {type: id, prefix: U}
+      signup_date: {type: date, start: 2025-01-01, end: 2025-02-28}
+      platform: {type: choice, values: [ios, android, web], p: [0.45, 0.35, 0.2]}
+  - name: events
+    rows: 40000
+    pk: event_id
+    fk: {user_id: users.user_id}
+    columns:
+      event_id: {type: id, prefix: EV, width: 8}
+      user_id: {type: fk, table: users, column: user_id}
+      event_ts: {type: expr, expr: "df.user_id.map(tables['users'].set_index('user_id').signup_date) + pd.to_timedelta(np.minimum(rng.exponential(12, n), 60), unit='D')"}
+      event_name: {type: choice, values: [app_open, view_item, add_to_cart, purchase], p: [0.54, 0.3, 0.15, 0.01]}
+  - name: assignments
+    rows: 2000
+    pk: user_id
+    fk: {user_id: users.user_id}
+    columns:
+      user_id: {type: fk, table: users, column: user_id, unique: true}
+      experiment_id: {type: choice, values: [checkout_v2]}
+      variant: {type: choice, values: [control, treatment]}
