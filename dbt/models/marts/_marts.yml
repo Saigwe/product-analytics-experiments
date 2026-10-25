@@ -1,12 +1,59 @@
 version: 2
+
 models:
-  - name: rpt_retention_cohorts
+  - name: fct_sessions
+    description: One row per session (30-minute inactivity rule), with funnel flags.
+    columns:
+      - name: session_id
+        data_tests: [unique, not_null]
+  - name: fct_user_day
+    description: One row per visitor per active day.
     data_tests:
       - unique_combination:
           arguments:
-            columns: [cohort_week, week_number]
-  - name: rpt_experiment_results
-    data_tests:
-      - unique_combination:
-          arguments:
-            columns: [experiment_id, variant]
+            columns: [visitor_id, activity_date]
+  - name: rpt_funnel_weekly
+    columns:
+      - name: week_start
+        data_tests: [unique, not_null]
+  - name: rpt_retention
+    columns:
+      - name: cohort_week
+        data_tests: [unique, not_null]
+  - name: rpt_dau_mau
+    columns:
+      - name: activity_date
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: a_gap_over_30_minutes_starts_a_new_session
+    model: int_events_sessionised
+    given:
+      - input: ref('stg_retailrocket__events')
+        rows:
+          - {event_key: 1, visitor_id: 7, event_ts: "2015-06-01 10:00:00", event_type: view}
+          - {event_key: 2, visitor_id: 7, event_ts: "2015-06-01 10:29:00", event_type: view}
+          - {event_key: 3, visitor_id: 7, event_ts: "2015-06-01 11:00:01", event_type: addtocart}
+          - {event_key: 4, visitor_id: 8, event_ts: "2015-06-01 10:00:00", event_type: view}
+      - input: ref('int_bot_visitors')
+        rows: []
+    expect:
+      rows:
+        - {event_key: 1, session_number: 1, session_id: "7-1"}
+        - {event_key: 2, session_number: 1, session_id: "7-1"}
+        - {event_key: 3, session_number: 2, session_id: "7-2"}
+        - {event_key: 4, session_number: 1, session_id: "8-1"}
+
+  - name: bot_visitors_are_excluded_from_sessions
+    model: int_events_sessionised
+    given:
+      - input: ref('stg_retailrocket__events')
+        rows:
+          - {event_key: 1, visitor_id: 1, event_ts: "2015-06-01 10:00:00", event_type: view}
+          - {event_key: 2, visitor_id: 99, event_ts: "2015-06-01 10:00:00", event_type: view}
+      - input: ref('int_bot_visitors')
+        rows:
+          - {visitor_id: 99}
+    expect:
+      rows:
+        - {event_key: 1, visitor_id: 1}

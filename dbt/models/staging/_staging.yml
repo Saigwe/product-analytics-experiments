@@ -1,31 +1,14 @@
 version: 2
+
 models:
-- name: stg_bronze__users
-  columns:
-  - name: user_id
-    data_tests:
-    - unique
-    - not_null
-- name: stg_bronze__events
-  columns:
-  - name: event_id
-    data_tests:
-    - unique
-    - not_null
-  - name: user_id
-    data_tests:
-    - not_null
-    - relationships:
-        arguments:
-          to: ref('stg_bronze__users')
-          field: user_id
-- name: stg_bronze__assignments
-  columns:
-  - name: user_id
-    data_tests:
-    - unique
-    - not_null
-    - relationships:
-        arguments:
-          to: ref('stg_bronze__users')
-          field: user_id
+  - name: stg_retailrocket__events
+    columns:
+      - name: event_key
+        data_tests: [unique, not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [view, addtocart, transaction]
+      - name: visitor_id
+        data_tests: [not_null]

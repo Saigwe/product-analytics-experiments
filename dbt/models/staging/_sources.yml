@@ -1,8 +1,8 @@
 version: 2
+
 sources:
-- name: bronze
-  description: Raw tables, loaded by the fixture generator (CI) or the real-data loaders.
-  tables:
-  - name: users
-  - name: events
-  - name: assignments
+  - name: bronze
+    description: RetailRocket events (ingestion/load_retailrocket.py), or the CI fixture in the same format.
+    tables:
+      - name: events
+        description: One row per event. timestamp is milliseconds since epoch (UTC).

@@ -1,22 +1,26 @@
 name: product_analytics_experiments
-version: 0.1.0
+version: 0.2.0
 config-version: 2
 profile: product_analytics_experiments
-model-paths:
-- models
-macro-paths:
-- macros
-test-paths:
-- tests
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
 target-path: target
-clean-targets:
-- target
-- dbt_packages
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  session_gap_minutes: 30      # a new session starts after 30 minutes without an event
+  bot_max_views_per_day: 300   # a visitor viewing more items than this on any day is treated as a bot
+
 models:
   product_analytics_experiments:
     staging:
       +schema: silver
       +materialized: view
+    intermediate:
+      +schema: silver
+      +materialized: table
     marts:
       +schema: gold
       +materialized: table

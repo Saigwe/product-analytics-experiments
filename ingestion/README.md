@@ -1,5 +1,11 @@
-# Ingestion (roadmap)
+# Ingestion
 
-Loaders for the real data go here and write to the same `bronze` tables as the fixture.
+`load_retailrocket.py` loads RetailRocket's `events.csv` into `bronze.events`. It checks the five expected columns first.
 
-Real data: the [Google Analytics 4 sample e-commerce dataset](https://developers.google.com/analytics/bigquery/web-ecommerce-demo-dataset) in the BigQuery public datasets (free sandbox). CI uses a synthetic users, events and experiment-assignment fixture.
+1. Download the dataset from [Kaggle: retailrocket/ecommerce-dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset). A free sign-in is needed.
+2. Unzip it and save `events.csv` as `data/raw/events.csv`. The `data/` folder is gitignored.
+3. Run `make all`.
+
+The roadmap first named the GA4 sample in BigQuery. RetailRocket was chosen instead because it can be downloaded once, with no cloud account. It also has the same kind of view → cart → purchase events for sessions, funnels and retention.
+
+CI uses `tests/fixtures/make_retailrocket_fixture.py`, which writes a file in the same format.
