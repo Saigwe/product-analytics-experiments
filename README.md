@@ -106,6 +106,7 @@ make fixture-all    # RetailRocket-format fixture (CI)
 - [ ] Delta-method variance for session-level metrics under visitor randomisation
 - [ ] Winsorised views and sequential testing (always-valid p-values)
 - [ ] Lightdash or Evidence dashboard on the gold models
+- [ ] 3-minute Loom walkthrough ([script ready](docs/walkthrough.md))
 
 ## Interview topics this project prepares
 - Product sense: choosing the metric to move, and why
