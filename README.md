@@ -20,6 +20,13 @@ This rebuilds the consumer product analytics from my analytics engineering role 
 | **Why it matters** | One trusted number per metric, and experiments that only declare winners that are real, sized for the traffic the site actually has. |
 | **Proof** | 27 dbt checks pass on 2.76M events in 8.5 s. Planted lifts are recovered within 0.3 points, with 93–97% interval coverage. A 2% split error is caught (p = 2e-10). See [Numbers](#numbers). |
 
+## Charts
+Rendered from this repo's own results by `charts/make_charts.py` (`make charts`); CI re-renders them on every push.
+
+![Statistical power of a plain t-test vs CUPED for conversion and views per visitor](docs/charts/power_cuped.png)
+
+![Users per arm needed for 80% power at each lift vs visitors available in 28 days](docs/charts/sample_size.png)
+
 ## Architecture
 ```mermaid
 flowchart LR

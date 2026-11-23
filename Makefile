@@ -4,7 +4,7 @@ CSV ?= data/raw/events.csv
 FIXTURE_DB ?= warehouse/fixture.duckdb
 DBT = cd dbt && DUCKDB_PATH=../$(DB) dbt
 
-.PHONY: all fixture-all pytest bronze bronze-fixture dbt experiments clean
+.PHONY: all fixture-all pytest bronze bronze-fixture dbt experiments clean charts
 
 all: pytest bronze dbt experiments                        ## real RetailRocket (download it first, see README)
 fixture-all: pytest                                       ## RetailRocket-format fixture (CI)
@@ -26,3 +26,6 @@ experiments:
 
 clean:
 	rm -rf warehouse dbt/target dbt/logs data/fixture
+
+charts:                                            ## README charts -> docs/charts
+	$(PY) charts/make_charts.py
